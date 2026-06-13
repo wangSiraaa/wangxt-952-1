@@ -1,4 +1,4 @@
-import { Clock, Syringe, Armchair, Sparkles } from 'lucide-react';
+import { Clock, Syringe, Armchair, Sparkles, FlaskConical, Pause, Eye } from 'lucide-react';
 import { useInfusionStore } from '../store/useInfusionStore';
 import { useShallow } from 'zustand/react/shallow';
 import { cn } from '../lib/utils';
@@ -38,7 +38,15 @@ export default function StatisticsPanel() {
   );
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-4">
+      <StatCard
+        title="核验中"
+        value={stats.verifyingCount}
+        icon={FlaskConical}
+        colorClass="text-cyan-600"
+        bgClass="bg-cyan-50"
+        dotClass="bg-cyan-500"
+      />
       <StatCard
         title="排队中"
         value={stats.waitingCount}
@@ -54,6 +62,22 @@ export default function StatisticsPanel() {
         colorClass="text-blue-600"
         bgClass="bg-blue-50"
         dotClass="bg-blue-500"
+      />
+      <StatCard
+        title="已暂停"
+        value={stats.pausedCount}
+        icon={Pause}
+        colorClass="text-yellow-600"
+        bgClass="bg-yellow-50"
+        dotClass="bg-yellow-500"
+      />
+      <StatCard
+        title="留观中"
+        value={stats.observationCount}
+        icon={Eye}
+        colorClass="text-purple-600"
+        bgClass="bg-purple-50"
+        dotClass="bg-purple-500"
       />
       <StatCard
         title="可用座位"

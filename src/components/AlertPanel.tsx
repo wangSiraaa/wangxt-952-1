@@ -1,6 +1,7 @@
-import { AlertTriangle, Pill, Check } from 'lucide-react';
+import { AlertTriangle, Pill, Check, Eye, FlaskConical, Siren } from 'lucide-react';
 import { useInfusionStore } from '../store/useInfusionStore';
 import { useShallow } from 'zustand/react/shallow';
+import { SKIN_TEST_LABELS } from '../types';
 import { cn } from '../lib/utils';
 import type { Patient } from '../types';
 
@@ -11,63 +12,133 @@ interface AlertPanelProps {
 interface AlertItemProps {
   patient: Patient;
   currentRole: string;
-  onConfirmAllergy: () => void;
+  alertType: 'observation_alert' | 'allergy' | 'skin_test_positive' | 'verifying' | 'special_med';
+  onConfirmAllergy?: () => void;
+  onResolveObservationAlert?: () => void;
   onViewDetail: () => void;
 }
 
-function AlertItem({ patient, currentRole, onConfirmAllergy, onViewDetail }: AlertItemProps) {
+function AlertItem({ patient, currentRole, alertType, onConfirmAllergy, onResolveObservationAlert, onViewDetail }: AlertItemProps) {
   const needsAllergyConfirm = patient.isAllergyRisk && !patient.allergyConfirmed;
+
+  const config = {
+    observation_alert: {
+      border: 'border-red-600',
+      bg: 'bg-red-50',
+      iconBg: 'bg-red-600',
+      icon: <Siren size={16} className="text-white" />,
+      animate: true,
+    },
+    allergy: {
+      border: 'border-red-500',
+      bg: 'bg-red-50',
+      iconBg: 'bg-red-500',
+      icon: <AlertTriangle size={16} className="text-white" />,
+      animate: true,
+    },
+    skin_test_positive: {
+      border: 'border-red-500',
+      bg: 'bg-red-50',
+      iconBg: 'bg-red-500',
+      icon: <FlaskConical size={16} className="text-white" />,
+      animate: false,
+    },
+    verifying: {
+      border: 'border-cyan-500',
+      bg: 'bg-cyan-50',
+      iconBg: 'bg-cyan-500',
+      icon: <FlaskConical size={16} className="text-white" />,
+      animate: false,
+    },
+    special_med: {
+      border: 'border-orange-500',
+      bg: 'bg-orange-50',
+      iconBg: 'bg-orange-500',
+      icon: <Pill size={16} className="text-white" />,
+      animate: false,
+    },
+  };
+
+  const c = config[alertType];
+
+  const getAlertMessage = () => {
+    switch (alertType) {
+      case 'observation_alert':
+        return (
+          <span className="text-red-600 font-medium">
+            留观异常：{patient.observationAlertNote}
+          </span>
+        );
+      case 'allergy':
+        return (
+          <span className="text-red-600 font-medium">
+            过敏风险：{patient.allergies.join('、')}，需人工确认
+          </span>
+        );
+      case 'skin_test_positive':
+        return (
+          <span className="text-red-600 font-medium">
+            皮试阳性：{SKIN_TEST_LABELS[patient.skinTestResult]}，禁止用药
+          </span>
+        );
+      case 'verifying':
+        return (
+          <span className="text-cyan-600">
+            药品核验{patient.drugBatchVerified ? '✓' : '待完成'} · 皮试{SKIN_TEST_LABELS[patient.skinTestResult]}
+            {!patient.drugBatchVerified && '，请完成核验后进入排队'}
+          </span>
+        );
+      case 'special_med':
+        return (
+          <span className="text-orange-600">
+            特殊用药：{patient.medication}
+          </span>
+        );
+    }
+  };
 
   return (
     <div
       className={cn(
         'p-4 rounded-xl border-2 mb-3 transition-all duration-300',
-        needsAllergyConfirm
-          ? 'border-red-500 bg-red-50 animate-breath'
-          : 'border-orange-500 bg-orange-50'
+        c.border,
+        c.bg,
+        c.animate && 'animate-breath'
       )}
     >
       <div className="flex items-start justify-between">
         <div className="flex items-start gap-3">
-          <div className={cn(
-            'w-8 h-8 rounded-full flex items-center justify-center',
-            needsAllergyConfirm ? 'bg-red-500' : 'bg-orange-500'
-          )}>
-            {needsAllergyConfirm ? (
-              <AlertTriangle size={16} className="text-white" />
-            ) : (
-              <Pill size={16} className="text-white" />
-            )}
+          <div className={cn('w-8 h-8 rounded-full flex items-center justify-center', c.iconBg)}>
+            {c.icon}
           </div>
           <div>
             <div className="flex items-center gap-2">
               <span className="font-semibold text-gray-800">{patient.name}</span>
               <span className="text-sm text-gray-500">{patient.queueNumber}</span>
             </div>
-            <p className="text-sm mt-1">
-              {needsAllergyConfirm ? (
-                <span className="text-red-600 font-medium">
-                  过敏风险：{patient.allergies.join('、')}，需人工确认
-                </span>
-              ) : (
-                <span className="text-orange-600">
-                  特殊用药：{patient.medication}
-                </span>
-              )}
-            </p>
+            <p className="text-sm mt-1">{getAlertMessage()}</p>
             {patient.notes && (
               <p className="text-xs text-gray-500 mt-1">备注：{patient.notes}</p>
             )}
           </div>
         </div>
         <div className="flex gap-2">
-          {currentRole === 'nurse' && needsAllergyConfirm && (
+          {currentRole === 'nurse' && needsAllergyConfirm && alertType === 'allergy' && (
             <button
               onClick={onConfirmAllergy}
               className="flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
             >
               <Check size={14} />
               确认
+            </button>
+          )}
+          {currentRole === 'nurse' && alertType === 'observation_alert' && (
+            <button
+              onClick={onResolveObservationAlert}
+              className="flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
+            >
+              <Check size={14} />
+              解除
             </button>
           )}
           {currentRole !== 'patient' && (
@@ -89,19 +160,24 @@ export default function AlertPanel({ onSelectPatient }: AlertPanelProps) {
     currentRole,
     getAlertPatients,
     confirmAllergy,
+    resolveObservationAlert,
     getPatientById,
   } = useInfusionStore(
     useShallow(state => ({
       currentRole: state.currentRole,
       getAlertPatients: state.getAlertPatients,
       confirmAllergy: state.confirmAllergy,
+      resolveObservationAlert: state.resolveObservationAlert,
       getPatientById: state.getPatientById,
     }))
   );
 
   const alertPatients = getAlertPatients();
-  const allergyAlerts = alertPatients.filter(p => p.isAllergyRisk && !p.allergyConfirmed);
-  const specialMedAlerts = alertPatients.filter(p => p.isSpecialMedication && (p.allergyConfirmed || !p.isAllergyRisk));
+  const observationAlerts = alertPatients.filter(p => p.status === 'observation' && p.observationAlert);
+  const allergyAlerts = alertPatients.filter(p => p.isAllergyRisk && !p.allergyConfirmed && p.status !== 'observation');
+  const skinTestAlerts = alertPatients.filter(p => p.skinTestResult === 'positive');
+  const verifyingAlerts = alertPatients.filter(p => p.status === 'verifying');
+  const specialMedAlerts = alertPatients.filter(p => p.isSpecialMedication && p.allergyConfirmed && p.status === 'waiting');
 
   const handleViewDetail = (patientId: string) => {
     const patient = getPatientById(patientId);
@@ -135,9 +211,28 @@ export default function AlertPanel({ onSelectPatient }: AlertPanelProps) {
           </div>
         ) : (
           <>
+            {observationAlerts.length > 0 && (
+              <div className="mb-4">
+                <h4 className="text-sm font-medium text-red-600 mb-2 flex items-center gap-1">
+                  <Siren size={14} />
+                  留观告警 ({observationAlerts.length})
+                </h4>
+                {observationAlerts.map(patient => (
+                  <AlertItem
+                    key={patient.id}
+                    patient={patient}
+                    currentRole={currentRole}
+                    alertType="observation_alert"
+                    onResolveObservationAlert={() => resolveObservationAlert(patient.id)}
+                    onViewDetail={() => handleViewDetail(patient.id)}
+                  />
+                ))}
+              </div>
+            )}
             {allergyAlerts.length > 0 && (
               <div className="mb-4">
-                <h4 className="text-sm font-medium text-red-600 mb-2">
+                <h4 className="text-sm font-medium text-red-600 mb-2 flex items-center gap-1">
+                  <AlertTriangle size={14} />
                   待确认过敏 ({allergyAlerts.length})
                 </h4>
                 {allergyAlerts.map(patient => (
@@ -145,7 +240,42 @@ export default function AlertPanel({ onSelectPatient }: AlertPanelProps) {
                     key={patient.id}
                     patient={patient}
                     currentRole={currentRole}
+                    alertType="allergy"
                     onConfirmAllergy={() => confirmAllergy(patient.id)}
+                    onViewDetail={() => handleViewDetail(patient.id)}
+                  />
+                ))}
+              </div>
+            )}
+            {skinTestAlerts.length > 0 && (
+              <div className="mb-4">
+                <h4 className="text-sm font-medium text-red-600 mb-2 flex items-center gap-1">
+                  <FlaskConical size={14} />
+                  皮试阳性 ({skinTestAlerts.length})
+                </h4>
+                {skinTestAlerts.map(patient => (
+                  <AlertItem
+                    key={patient.id}
+                    patient={patient}
+                    currentRole={currentRole}
+                    alertType="skin_test_positive"
+                    onViewDetail={() => handleViewDetail(patient.id)}
+                  />
+                ))}
+              </div>
+            )}
+            {verifyingAlerts.length > 0 && (
+              <div className="mb-4">
+                <h4 className="text-sm font-medium text-cyan-600 mb-2 flex items-center gap-1">
+                  <FlaskConical size={14} />
+                  核验中 ({verifyingAlerts.length})
+                </h4>
+                {verifyingAlerts.map(patient => (
+                  <AlertItem
+                    key={patient.id}
+                    patient={patient}
+                    currentRole={currentRole}
+                    alertType="verifying"
                     onViewDetail={() => handleViewDetail(patient.id)}
                   />
                 ))}
@@ -153,7 +283,8 @@ export default function AlertPanel({ onSelectPatient }: AlertPanelProps) {
             )}
             {specialMedAlerts.length > 0 && (
               <div>
-                <h4 className="text-sm font-medium text-orange-600 mb-2">
+                <h4 className="text-sm font-medium text-orange-600 mb-2 flex items-center gap-1">
+                  <Pill size={14} />
                   特殊用药 ({specialMedAlerts.length})
                 </h4>
                 {specialMedAlerts.map(patient => (
@@ -161,7 +292,7 @@ export default function AlertPanel({ onSelectPatient }: AlertPanelProps) {
                     key={patient.id}
                     patient={patient}
                     currentRole={currentRole}
-                    onConfirmAllergy={() => {}}
+                    alertType="special_med"
                     onViewDetail={() => handleViewDetail(patient.id)}
                   />
                 ))}

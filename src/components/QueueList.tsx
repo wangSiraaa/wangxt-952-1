@@ -1,7 +1,7 @@
-import { AlertTriangle, Pill, Clock, ChevronRight, Eye } from 'lucide-react';
+import { AlertTriangle, Pill, Clock, ChevronRight, Eye, Baby, ShieldAlert, FlaskConical, Pause, Syringe } from 'lucide-react';
 import { useInfusionStore } from '../store/useInfusionStore';
 import { useShallow } from 'zustand/react/shallow';
-import { PATIENT_STATUS_LABELS } from '../types';
+import { PATIENT_STATUS_LABELS, SKIN_TEST_LABELS, RISK_LEVEL_LABELS, INFUSION_PHASE_LABELS } from '../types';
 import { cn } from '../lib/utils';
 import { formatDuration } from '../utils/formatters';
 import type { Patient } from '../types';
@@ -23,9 +23,15 @@ interface PatientItemProps {
 function PatientItem({ patient, index, isSelected, onSelect, onViewDetails, currentRole }: PatientItemProps) {
   const hasAllergyAlert = patient.isAllergyRisk && !patient.allergyConfirmed;
   const hasSpecialMed = patient.isSpecialMedication;
+  const isChildPriority = patient.riskLevel === 'child';
+  const isHighRisk = patient.riskLevel === 'high';
+  const isVerifying = patient.status === 'verifying';
+  const isPaused = patient.status === 'paused';
+  const isObservation = patient.status === 'observation';
+  const isObservationAlert = isObservation && patient.observationAlert;
 
   const handleCardClick = () => {
-    if (currentRole === 'nurse' && patient.status === 'waiting') {
+    if (currentRole === 'nurse' && (patient.status === 'waiting' || patient.status === 'verifying')) {
       onSelect();
     } else {
       onViewDetails();
@@ -40,19 +46,26 @@ function PatientItem({ patient, index, isSelected, onSelect, onViewDetails, curr
         isSelected
           ? 'border-blue-600 bg-blue-50 shadow-md scale-[1.02]'
           : 'border-gray-100 bg-white hover:border-gray-200 hover:shadow-sm',
-        hasAllergyAlert && 'border-l-4 border-l-red-500'
+        hasAllergyAlert && 'border-l-4 border-l-red-500',
+        isObservationAlert && 'border-l-4 border-l-red-600',
+        isPaused && 'border-l-4 border-l-yellow-500',
+        isVerifying && 'border-l-4 border-l-cyan-500'
       )}
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className={cn(
             'w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm',
+            isVerifying ? 'bg-cyan-500' :
+            isObservationAlert ? 'bg-red-600 animate-pulse' :
+            isObservation ? 'bg-purple-500' :
+            isPaused ? 'bg-yellow-500' :
             index === 0 ? 'bg-blue-600 animate-pulse' : 'bg-gray-400'
           )}>
             {patient.queueNumber.slice(-3)}
           </div>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="font-semibold text-gray-800">{patient.name}</span>
               <span className="text-sm text-gray-500">{patient.age}岁{patient.gender}</span>
               {hasAllergyAlert && (
@@ -67,18 +80,64 @@ function PatientItem({ patient, index, isSelected, onSelect, onViewDetails, curr
                   特殊用药
                 </span>
               )}
+              {isChildPriority && (
+                <span className="flex items-center gap-1 text-xs text-pink-600 bg-pink-50 px-2 py-0.5 rounded-full">
+                  <Baby size={12} />
+                  儿童优先
+                </span>
+              )}
+              {isHighRisk && (
+                <span className="flex items-center gap-1 text-xs text-red-600 bg-red-50 px-2 py-0.5 rounded-full">
+                  <ShieldAlert size={12} />
+                  高风险
+                </span>
+              )}
+              {isObservationAlert && (
+                <span className="flex items-center gap-1 text-xs text-red-700 bg-red-100 px-2 py-0.5 rounded-full animate-pulse">
+                  <AlertTriangle size={12} />
+                  留观告警
+                </span>
+              )}
             </div>
-            <div className="flex items-center gap-3 mt-1">
+            <div className="flex items-center gap-3 mt-1 flex-wrap">
               <span className={cn(
                 'text-xs px-2 py-0.5 rounded',
-                patient.status === 'waiting' ? 'bg-orange-50 text-orange-600' : 'bg-blue-50 text-blue-600'
+                patient.status === 'verifying' ? 'bg-cyan-50 text-cyan-600' :
+                patient.status === 'waiting' ? 'bg-orange-50 text-orange-600' :
+                patient.status === 'infusing' ? 'bg-blue-50 text-blue-600' :
+                patient.status === 'paused' ? 'bg-yellow-50 text-yellow-600' :
+                patient.status === 'observation' ? 'bg-purple-50 text-purple-600' :
+                'bg-gray-50 text-gray-600'
               )}>
                 {PATIENT_STATUS_LABELS[patient.status]}
               </span>
-              <span className="text-xs text-gray-400 flex items-center gap-1">
-                <Clock size={12} />
-                预计等待 {formatDuration(patient.estimatedWaitTime)}
-              </span>
+              {!patient.drugBatchVerified && (
+                <span className="flex items-center gap-1 text-xs text-cyan-600">
+                  <FlaskConical size={10} />
+                  药品未核验
+                </span>
+              )}
+              {patient.skinTestResult !== 'negative' && (
+                <span className={cn(
+                  'flex items-center gap-1 text-xs',
+                  patient.skinTestResult === 'positive' ? 'text-red-600' : 'text-gray-500'
+                )}>
+                  <FlaskConical size={10} />
+                  皮试：{SKIN_TEST_LABELS[patient.skinTestResult]}
+                </span>
+              )}
+              {(patient.status === 'infusing' || patient.status === 'paused') && patient.bottleCount > 1 && (
+                <span className="flex items-center gap-1 text-xs text-blue-600">
+                  <Syringe size={10} />
+                  {patient.currentBottle}/{patient.bottleCount}瓶 · {INFUSION_PHASE_LABELS[patient.infusionPhase]}
+                </span>
+              )}
+              {patient.status === 'waiting' && (
+                <span className="text-xs text-gray-400 flex items-center gap-1">
+                  <Clock size={12} />
+                  预计等待 {formatDuration(patient.estimatedWaitTime)}
+                </span>
+              )}
               {patient.seatId && (
                 <span className="text-xs text-gray-400">座位: {patient.seatId}</span>
               )}
@@ -87,7 +146,7 @@ function PatientItem({ patient, index, isSelected, onSelect, onViewDetails, curr
         </div>
         {currentRole !== 'patient' && (
           <div className="flex items-center gap-2">
-            {currentRole === 'nurse' && patient.status === 'waiting' && (
+            {currentRole === 'nurse' && (patient.status === 'waiting' || patient.status === 'verifying') && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -101,7 +160,7 @@ function PatientItem({ patient, index, isSelected, onSelect, onViewDetails, curr
             )}
             <ChevronRight size={20} className={cn(
               'transition-colors',
-              currentRole === 'nurse' && patient.status === 'waiting'
+              currentRole === 'nurse' && (patient.status === 'waiting' || patient.status === 'verifying')
                 ? 'text-blue-400'
                 : 'text-gray-300'
             )} />
@@ -116,8 +175,11 @@ export default function QueueList({ onSelectPatient, onViewPatientDetails }: Que
   const {
     currentRole,
     selectedPatientId,
+    getVerifyingPatients,
     getWaitingPatients,
     getInfusingPatients,
+    getPausedPatients,
+    getObservationPatients,
     currentPatientViewId,
     getPatientById,
     setSelectedPatient,
@@ -125,16 +187,22 @@ export default function QueueList({ onSelectPatient, onViewPatientDetails }: Que
     useShallow(state => ({
       currentRole: state.currentRole,
       selectedPatientId: state.selectedPatientId,
+      getVerifyingPatients: state.getVerifyingPatients,
       getWaitingPatients: state.getWaitingPatients,
       getInfusingPatients: state.getInfusingPatients,
+      getPausedPatients: state.getPausedPatients,
+      getObservationPatients: state.getObservationPatients,
       currentPatientViewId: state.currentPatientViewId,
       getPatientById: state.getPatientById,
       setSelectedPatient: state.setSelectedPatient,
     }))
   );
 
+  const verifyingPatients = getVerifyingPatients();
   const waitingPatients = getWaitingPatients();
   const infusingPatients = getInfusingPatients();
+  const pausedPatients = getPausedPatients();
+  const observationPatients = getObservationPatients();
 
   const handleSelectPatient = (patient: Patient) => {
     if (currentRole === 'patient') return;
@@ -165,9 +233,12 @@ export default function QueueList({ onSelectPatient, onViewPatientDetails }: Que
             </p>
             <div className={cn(
               'inline-block px-4 py-2 rounded-full text-sm font-medium',
-              currentPatient.status === 'waiting'
-                ? 'bg-orange-50 text-orange-600'
-                : 'bg-blue-50 text-blue-600'
+              currentPatient.status === 'verifying' ? 'bg-cyan-50 text-cyan-600' :
+              currentPatient.status === 'waiting' ? 'bg-orange-50 text-orange-600' :
+              currentPatient.status === 'infusing' ? 'bg-blue-50 text-blue-600' :
+              currentPatient.status === 'paused' ? 'bg-yellow-50 text-yellow-600' :
+              currentPatient.status === 'observation' ? 'bg-purple-50 text-purple-600' :
+              'bg-gray-50 text-gray-600'
             )}>
               {PATIENT_STATUS_LABELS[currentPatient.status]}
             </div>
@@ -202,17 +273,17 @@ export default function QueueList({ onSelectPatient, onViewPatientDetails }: Que
   }
 
   const selectedPatient = selectedPatientId ? getPatientById(selectedPatientId) : null;
-  const selectedIsWaiting = selectedPatient?.status === 'waiting';
+  const selectedIsWaitingOrVerifying = selectedPatient?.status === 'waiting' || selectedPatient?.status === 'verifying';
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
       <div className="p-4 border-b border-gray-100">
         <h3 className="text-lg font-semibold text-gray-800">排队队列</h3>
         <p className="text-sm text-gray-500">
-          等待 {waitingPatients.length} 人，输液中 {infusingPatients.length} 人
+          核验 {verifyingPatients.length} · 等待 {waitingPatients.length} · 输液 {infusingPatients.length} · 暂停 {pausedPatients.length} · 留观 {observationPatients.length}
         </p>
       </div>
-      {currentRole === 'nurse' && selectedPatientId && selectedIsWaiting && (
+      {currentRole === 'nurse' && selectedPatientId && selectedIsWaitingOrVerifying && (
         <div className="px-4 py-3 bg-blue-50 border-b border-blue-100 animate-fade-in">
           <div className="flex items-center gap-2">
             <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-xs font-bold">✓</span>
@@ -221,32 +292,63 @@ export default function QueueList({ onSelectPatient, onViewPatientDetails }: Que
                 已选中 <span className="font-bold">{selectedPatient?.name}</span>（{selectedPatient?.queueNumber}）
               </p>
               <p className="text-xs text-blue-600 mt-0.5">
-                {(selectedPatient?.isAllergyRisk && !selectedPatient?.allergyConfirmed)
-                  ? '⚠️ 过敏待确认，不能安排座位，请先点击详情按钮确认过敏'
-                  : '请前往右侧座位图点击绿色可用座位安排患者'
-                }
+                {selectedPatient?.status === 'verifying' && '⚠️ 患者正在核验中，请先完成药品核验和皮试'}
+                {selectedPatient?.status === 'waiting' && !selectedPatient?.drugBatchVerified && '⚠️ 药品批次未核验，请先完成核验'}
+                {selectedPatient?.status === 'waiting' && selectedPatient?.drugBatchVerified && selectedPatient?.isAllergyRisk && !selectedPatient?.allergyConfirmed && '⚠️ 过敏待确认，不能安排座位，请先确认过敏'}
+                {selectedPatient?.status === 'waiting' && selectedPatient?.drugBatchVerified && (!selectedPatient?.isAllergyRisk || selectedPatient?.allergyConfirmed) && '请前往右侧座位图点击绿色可用座位安排患者'}
               </p>
             </div>
           </div>
         </div>
       )}
       <div className="p-4 max-h-[calc(100vh-400px)] overflow-y-auto custom-scrollbar">
-        {waitingPatients.length === 0 ? (
+        {verifyingPatients.length === 0 && waitingPatients.length === 0 ? (
           <div className="text-center py-8 text-gray-400">
             暂无排队患者
           </div>
         ) : (
-          waitingPatients.map((patient, index) => (
-            <PatientItem
-              key={patient.id}
-              patient={patient}
-              index={index}
-              isSelected={selectedPatientId === patient.id}
-              onSelect={() => handleSelectPatient(patient)}
-              onViewDetails={() => handleViewDetails(patient)}
-              currentRole={currentRole}
-            />
-          ))
+          <>
+            {verifyingPatients.length > 0 && (
+              <div className="mb-4">
+                <h4 className="text-sm font-medium text-cyan-600 mb-2 flex items-center gap-1">
+                  <FlaskConical size={14} />
+                  核验中 ({verifyingPatients.length})
+                </h4>
+                {verifyingPatients.map((patient, index) => (
+                  <PatientItem
+                    key={patient.id}
+                    patient={patient}
+                    index={index}
+                    isSelected={selectedPatientId === patient.id}
+                    onSelect={() => handleSelectPatient(patient)}
+                    onViewDetails={() => handleViewDetails(patient)}
+                    currentRole={currentRole}
+                  />
+                ))}
+              </div>
+            )}
+            {waitingPatients.length > 0 && (
+              <div>
+                {verifyingPatients.length > 0 && (
+                  <h4 className="text-sm font-medium text-orange-600 mb-2 flex items-center gap-1">
+                    <Clock size={14} />
+                    等待中 ({waitingPatients.length})
+                  </h4>
+                )}
+                {waitingPatients.map((patient, index) => (
+                  <PatientItem
+                    key={patient.id}
+                    patient={patient}
+                    index={index}
+                    isSelected={selectedPatientId === patient.id}
+                    onSelect={() => handleSelectPatient(patient)}
+                    onViewDetails={() => handleViewDetails(patient)}
+                    currentRole={currentRole}
+                  />
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
