@@ -176,7 +176,13 @@ export const useInfusionStore = create<InfusionState>((set, get) => ({
     set(state => ({
       patients: state.patients.map(p =>
         p.id === patientId
-          ? { ...p, seatId, assignedAt: new Date() }
+          ? {
+              ...p,
+              seatId,
+              assignedAt: new Date(),
+              status: 'infusing' as PatientStatus,
+              infusionStartedAt: new Date(),
+            }
           : p
       ),
       seats: state.seats.map(s => {

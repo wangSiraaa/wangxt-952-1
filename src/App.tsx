@@ -12,7 +12,23 @@ import type { Patient } from "@/types";
 
 function HomePage() {
   const currentRole = useInfusionStore((state) => state.currentRole);
+  const setSelectedPatientStore = useInfusionStore((state) => state.setSelectedPatient);
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
+
+  const handleSelectPatientForSeat = (patient: Patient) => {
+    setSelectedPatientStore(patient.id);
+    setSelectedPatient(null);
+  };
+
+  const handleViewPatientDetails = (patient: Patient) => {
+    setSelectedPatient(patient);
+    setSelectedPatientStore(patient.id);
+  };
+
+  const handleCloseModal = () => {
+    setSelectedPatient(null);
+    setSelectedPatientStore(null);
+  };
 
   const roleLabels = {
     nurse: "护士工作站",
@@ -44,12 +60,18 @@ function HomePage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
           <div className="lg:col-span-1">
-            <QueueList onSelectPatient={setSelectedPatient} />
+            <QueueList
+              onSelectPatient={handleSelectPatientForSeat}
+              onViewPatientDetails={handleViewPatientDetails}
+            />
           </div>
 
           <div className="lg:col-span-2 space-y-4">
-            <SeatMap onSelectPatient={setSelectedPatient} />
-            <AlertPanel onSelectPatient={setSelectedPatient} />
+            <SeatMap
+              onSelectPatient={handleViewPatientDetails}
+              onClearSelection={handleCloseModal}
+            />
+            <AlertPanel onSelectPatient={handleViewPatientDetails} />
           </div>
         </div>
       </main>
@@ -63,7 +85,7 @@ function HomePage() {
       {selectedPatient && (
         <PatientModal
           patient={selectedPatient}
-          onClose={() => setSelectedPatient(null)}
+          onClose={handleCloseModal}
         />
       )}
     </div>

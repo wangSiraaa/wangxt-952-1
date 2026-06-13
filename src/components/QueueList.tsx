@@ -1,4 +1,4 @@
-import { AlertTriangle, Pill, Clock, ChevronRight } from 'lucide-react';
+import { AlertTriangle, Pill, Clock, ChevronRight, Eye } from 'lucide-react';
 import { useInfusionStore } from '../store/useInfusionStore';
 import { useShallow } from 'zustand/react/shallow';
 import { PATIENT_STATUS_LABELS } from '../types';
@@ -8,23 +8,33 @@ import type { Patient } from '../types';
 
 interface QueueListProps {
   onSelectPatient: (patient: Patient) => void;
+  onViewPatientDetails: (patient: Patient) => void;
 }
 
 interface PatientItemProps {
   patient: Patient;
   index: number;
   isSelected: boolean;
-  onClick: () => void;
+  onSelect: () => void;
+  onViewDetails: () => void;
   currentRole: string;
 }
 
-function PatientItem({ patient, index, isSelected, onClick, currentRole }: PatientItemProps) {
+function PatientItem({ patient, index, isSelected, onSelect, onViewDetails, currentRole }: PatientItemProps) {
   const hasAllergyAlert = patient.isAllergyRisk && !patient.allergyConfirmed;
   const hasSpecialMed = patient.isSpecialMedication;
 
+  const handleCardClick = () => {
+    if (currentRole === 'nurse' && patient.status === 'waiting') {
+      onSelect();
+    } else {
+      onViewDetails();
+    }
+  };
+
   return (
     <div
-      onClick={onClick}
+      onClick={handleCardClick}
       className={cn(
         'p-4 rounded-xl border-2 cursor-pointer transition-all duration-300 mb-3',
         isSelected
@@ -76,14 +86,33 @@ function PatientItem({ patient, index, isSelected, onClick, currentRole }: Patie
           </div>
         </div>
         {currentRole !== 'patient' && (
-          <ChevronRight size={20} className="text-gray-300" />
+          <div className="flex items-center gap-2">
+            {currentRole === 'nurse' && patient.status === 'waiting' && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onViewDetails();
+                }}
+                className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                title="查看详情"
+              >
+                <Eye size={16} />
+              </button>
+            )}
+            <ChevronRight size={20} className={cn(
+              'transition-colors',
+              currentRole === 'nurse' && patient.status === 'waiting'
+                ? 'text-blue-400'
+                : 'text-gray-300'
+            )} />
+          </div>
         )}
       </div>
     </div>
   );
 }
 
-export default function QueueList({ onSelectPatient }: QueueListProps) {
+export default function QueueList({ onSelectPatient, onViewPatientDetails }: QueueListProps) {
   const {
     currentRole,
     selectedPatientId,
@@ -91,6 +120,7 @@ export default function QueueList({ onSelectPatient }: QueueListProps) {
     getInfusingPatients,
     currentPatientViewId,
     getPatientById,
+    setSelectedPatient,
   } = useInfusionStore(
     useShallow(state => ({
       currentRole: state.currentRole,
@@ -99,15 +129,22 @@ export default function QueueList({ onSelectPatient }: QueueListProps) {
       getInfusingPatients: state.getInfusingPatients,
       currentPatientViewId: state.currentPatientViewId,
       getPatientById: state.getPatientById,
+      setSelectedPatient: state.setSelectedPatient,
     }))
   );
 
   const waitingPatients = getWaitingPatients();
   const infusingPatients = getInfusingPatients();
 
-  const handlePatientClick = (patient: Patient) => {
+  const handleSelectPatient = (patient: Patient) => {
     if (currentRole === 'patient') return;
+    setSelectedPatient(patient.id);
     onSelectPatient(patient);
+  };
+
+  const handleViewDetails = (patient: Patient) => {
+    if (currentRole === 'patient') return;
+    onViewPatientDetails(patient);
   };
 
   if (currentRole === 'patient') {
@@ -164,6 +201,9 @@ export default function QueueList({ onSelectPatient }: QueueListProps) {
     );
   }
 
+  const selectedPatient = selectedPatientId ? getPatientById(selectedPatientId) : null;
+  const selectedIsWaiting = selectedPatient?.status === 'waiting';
+
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
       <div className="p-4 border-b border-gray-100">
@@ -172,6 +212,24 @@ export default function QueueList({ onSelectPatient }: QueueListProps) {
           等待 {waitingPatients.length} 人，输液中 {infusingPatients.length} 人
         </p>
       </div>
+      {currentRole === 'nurse' && selectedPatientId && selectedIsWaiting && (
+        <div className="px-4 py-3 bg-blue-50 border-b border-blue-100 animate-fade-in">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-xs font-bold">✓</span>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-blue-800">
+                已选中 <span className="font-bold">{selectedPatient?.name}</span>（{selectedPatient?.queueNumber}）
+              </p>
+              <p className="text-xs text-blue-600 mt-0.5">
+                {(selectedPatient?.isAllergyRisk && !selectedPatient?.allergyConfirmed)
+                  ? '⚠️ 过敏待确认，不能安排座位，请先点击详情按钮确认过敏'
+                  : '请前往右侧座位图点击绿色可用座位安排患者'
+                }
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="p-4 max-h-[calc(100vh-400px)] overflow-y-auto custom-scrollbar">
         {waitingPatients.length === 0 ? (
           <div className="text-center py-8 text-gray-400">
@@ -184,7 +242,8 @@ export default function QueueList({ onSelectPatient }: QueueListProps) {
               patient={patient}
               index={index}
               isSelected={selectedPatientId === patient.id}
-              onClick={() => handlePatientClick(patient)}
+              onSelect={() => handleSelectPatient(patient)}
+              onViewDetails={() => handleViewDetails(patient)}
               currentRole={currentRole}
             />
           ))

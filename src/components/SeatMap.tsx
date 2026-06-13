@@ -9,6 +9,7 @@ import type { Seat, SeatStatus, Patient } from '../types';
 
 interface SeatMapProps {
   onSelectPatient: (patient: Patient) => void;
+  onClearSelection?: () => void;
 }
 
 interface SeatCellProps {
@@ -17,6 +18,7 @@ interface SeatCellProps {
   onClick: () => void;
   currentRole: string;
   canAssign: boolean;
+  hasSelectedPatient: boolean;
   patientName?: string;
   patient?: Patient;
 }
@@ -27,6 +29,7 @@ const SeatCell = memo(function SeatCell({
   onClick,
   currentRole,
   canAssign,
+  hasSelectedPatient,
   patientName,
   patient,
 }: SeatCellProps) {
@@ -89,6 +92,9 @@ const SeatCell = memo(function SeatCell({
     }
   };
 
+  const showAvailableHighlight = hasSelectedPatient && seat.status === 'available';
+  const showAssignHint = canAssign;
+
   return (
     <div
       onClick={isClickable ? handleClick : undefined}
@@ -98,6 +104,8 @@ const SeatCell = memo(function SeatCell({
         config.border,
         isClickable && 'cursor-pointer hover:shadow-md hover:scale-105',
         isSelected && 'ring-2 ring-blue-500 ring-offset-2',
+        showAvailableHighlight && !canAssign && 'ring-2 ring-green-400 ring-offset-1 border-green-500 bg-green-100',
+        showAssignHint && 'ring-2 ring-green-500 ring-offset-2 scale-105 shadow-lg bg-green-100',
         !isClickable && 'cursor-default',
         seat.status === 'disinfecting' && 'animate-pulse-slow'
       )}
@@ -121,15 +129,19 @@ const SeatCell = memo(function SeatCell({
             <span className="text-xs text-red-600">{remaining}</span>
           </div>
         )}
-        {canAssign && (
-          <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-pulse" />
+        {showAssignHint && (
+          <div className="absolute -top-2 -right-2">
+            <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center animate-pulse shadow-md">
+              <span className="text-white text-xs font-bold">+</span>
+            </div>
+          </div>
         )}
       </div>
     </div>
   );
 });
 
-export default function SeatMap({ onSelectPatient }: SeatMapProps) {
+export default function SeatMap({ onSelectPatient, onClearSelection }: SeatMapProps) {
   const {
     seats,
     currentRole,
@@ -155,6 +167,8 @@ export default function SeatMap({ onSelectPatient }: SeatMapProps) {
   );
 
   const rows = Array.from(new Set(seats.map(s => s.row))).sort((a, b) => a - b);
+  const selectedPatient = selectedPatientId ? getPatientById(selectedPatientId) : null;
+  const hasSelectedPatientWaiting = selectedPatient?.status === 'waiting';
 
   const handleSeatClick = (seat: Seat) => {
     if (seat.status === 'occupied') {
@@ -176,6 +190,7 @@ export default function SeatMap({ onSelectPatient }: SeatMapProps) {
       const success = assignSeat(selectedPatientId, seat.id);
       if (success) {
         setSelectedPatient(null);
+        onClearSelection?.();
       }
     }
   };
@@ -204,9 +219,30 @@ export default function SeatMap({ onSelectPatient }: SeatMapProps) {
         </div>
       </div>
       <div className="p-6">
-        {currentRole === 'nurse' && selectedPatientId && (
-          <div className="mb-4 p-3 bg-blue-50 rounded-lg text-sm text-blue-600">
-            请点击一个绿色可用座位来安排患者
+        {currentRole === 'nurse' && selectedPatientId && selectedPatient && (
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg animate-fade-in">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-sm font-semibold text-blue-800">
+                  已选中：{selectedPatient.name} ({selectedPatient.queueNumber})
+                </span>
+                <p className="text-xs text-blue-600 mt-1">
+                  {selectedPatient.isAllergyRisk && !selectedPatient.allergyConfirmed
+                    ? '⚠️ 过敏待确认，请先在详情中确认过敏'
+                    : '请点击一个绿色可用座位来安排患者'
+                  }
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setSelectedPatient(null);
+                  onClearSelection?.();
+                }}
+                className="px-3 py-1 text-xs bg-white text-blue-600 border border-blue-300 rounded hover:bg-blue-50 transition-colors"
+              >
+                取消选中
+              </button>
+            </div>
           </div>
         )}
         <div className="space-y-3">
@@ -227,6 +263,7 @@ export default function SeatMap({ onSelectPatient }: SeatMapProps) {
                         onClick={() => handleSeatClick(seat)}
                         currentRole={currentRole}
                         canAssign={canAssign}
+                        hasSelectedPatient={hasSelectedPatientWaiting}
                         patientName={patient?.name}
                         patient={patient}
                       />
