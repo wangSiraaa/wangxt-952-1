@@ -86,6 +86,7 @@ export default function PatientModal({ patient, onClose }: PatientModalProps) {
     switch (status) {
       case 'verifying': return 'bg-cyan-50 text-cyan-600';
       case 'waiting': return 'bg-orange-50 text-orange-600';
+      case 'seated': return 'bg-teal-50 text-teal-600';
       case 'infusing': return 'bg-blue-50 text-blue-600';
       case 'paused': return 'bg-yellow-50 text-yellow-600';
       case 'observation': return 'bg-purple-50 text-purple-600';
@@ -120,7 +121,7 @@ export default function PatientModal({ patient, onClose }: PatientModalProps) {
                 {patient.seatId && (
                   <span className="text-sm text-gray-500">座位：{patient.seatId}</span>
                 )}
-                {patient.status !== 'verifying' && patient.status !== 'waiting' && (
+                {patient.status !== 'verifying' && patient.status !== 'waiting' && patient.status !== 'seated' && (
                   <span className="text-xs text-gray-400">
                     {INFUSION_PHASE_LABELS[patient.infusionPhase]}
                     {patient.bottleCount > 1 && ` · ${patient.currentBottle}/${patient.bottleCount}瓶`}

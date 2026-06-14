@@ -1,6 +1,6 @@
 export type UserRole = 'nurse' | 'doctor' | 'patient';
 
-export type PatientStatus = 'verifying' | 'waiting' | 'infusing' | 'paused' | 'observation' | 'completed' | 'cancelled';
+export type PatientStatus = 'verifying' | 'waiting' | 'seated' | 'infusing' | 'paused' | 'observation' | 'completed' | 'cancelled';
 
 export type SeatStatus = 'available' | 'occupied' | 'disinfecting' | 'maintenance';
 
@@ -56,6 +56,7 @@ export interface Seat {
 export interface Statistics {
   verifyingCount: number;
   waitingCount: number;
+  seatedCount: number;
   infusingCount: number;
   pausedCount: number;
   observationCount: number;
@@ -73,6 +74,7 @@ export const SEAT_STATUS_LABELS: Record<SeatStatus, string> = {
 export const PATIENT_STATUS_LABELS: Record<PatientStatus, string> = {
   verifying: '核验中',
   waiting: '排队中',
+  seated: '待开始',
   infusing: '输液中',
   paused: '已暂停',
   observation: '留观中',

@@ -1,4 +1,4 @@
-import { AlertTriangle, Pill, Clock, ChevronRight, Eye, Baby, ShieldAlert, FlaskConical, Pause, Syringe } from 'lucide-react';
+import { AlertTriangle, Pill, Clock, ChevronRight, Eye, Baby, ShieldAlert, FlaskConical, Pause, Syringe, UserCheck } from 'lucide-react';
 import { useInfusionStore } from '../store/useInfusionStore';
 import { useShallow } from 'zustand/react/shallow';
 import { PATIENT_STATUS_LABELS, SKIN_TEST_LABELS, RISK_LEVEL_LABELS, INFUSION_PHASE_LABELS } from '../types';
@@ -26,6 +26,7 @@ function PatientItem({ patient, index, isSelected, onSelect, onViewDetails, curr
   const isChildPriority = patient.riskLevel === 'child';
   const isHighRisk = patient.riskLevel === 'high';
   const isVerifying = patient.status === 'verifying';
+  const isSeated = patient.status === 'seated';
   const isPaused = patient.status === 'paused';
   const isObservation = patient.status === 'observation';
   const isObservationAlert = isObservation && patient.observationAlert;
@@ -49,7 +50,8 @@ function PatientItem({ patient, index, isSelected, onSelect, onViewDetails, curr
         hasAllergyAlert && 'border-l-4 border-l-red-500',
         isObservationAlert && 'border-l-4 border-l-red-600',
         isPaused && 'border-l-4 border-l-yellow-500',
-        isVerifying && 'border-l-4 border-l-cyan-500'
+        isVerifying && 'border-l-4 border-l-cyan-500',
+        isSeated && 'border-l-4 border-l-teal-500'
       )}
     >
       <div className="flex items-center justify-between">
@@ -104,6 +106,7 @@ function PatientItem({ patient, index, isSelected, onSelect, onViewDetails, curr
                 'text-xs px-2 py-0.5 rounded',
                 patient.status === 'verifying' ? 'bg-cyan-50 text-cyan-600' :
                 patient.status === 'waiting' ? 'bg-orange-50 text-orange-600' :
+                patient.status === 'seated' ? 'bg-teal-50 text-teal-600' :
                 patient.status === 'infusing' ? 'bg-blue-50 text-blue-600' :
                 patient.status === 'paused' ? 'bg-yellow-50 text-yellow-600' :
                 patient.status === 'observation' ? 'bg-purple-50 text-purple-600' :
@@ -177,6 +180,7 @@ export default function QueueList({ onSelectPatient, onViewPatientDetails }: Que
     selectedPatientId,
     getVerifyingPatients,
     getWaitingPatients,
+    getSeatedPatients,
     getInfusingPatients,
     getPausedPatients,
     getObservationPatients,
@@ -189,6 +193,7 @@ export default function QueueList({ onSelectPatient, onViewPatientDetails }: Que
       selectedPatientId: state.selectedPatientId,
       getVerifyingPatients: state.getVerifyingPatients,
       getWaitingPatients: state.getWaitingPatients,
+      getSeatedPatients: state.getSeatedPatients,
       getInfusingPatients: state.getInfusingPatients,
       getPausedPatients: state.getPausedPatients,
       getObservationPatients: state.getObservationPatients,
@@ -200,6 +205,7 @@ export default function QueueList({ onSelectPatient, onViewPatientDetails }: Que
 
   const verifyingPatients = getVerifyingPatients();
   const waitingPatients = getWaitingPatients();
+  const seatedPatients = getSeatedPatients();
   const infusingPatients = getInfusingPatients();
   const pausedPatients = getPausedPatients();
   const observationPatients = getObservationPatients();
@@ -235,6 +241,7 @@ export default function QueueList({ onSelectPatient, onViewPatientDetails }: Que
               'inline-block px-4 py-2 rounded-full text-sm font-medium',
               currentPatient.status === 'verifying' ? 'bg-cyan-50 text-cyan-600' :
               currentPatient.status === 'waiting' ? 'bg-orange-50 text-orange-600' :
+              currentPatient.status === 'seated' ? 'bg-teal-50 text-teal-600' :
               currentPatient.status === 'infusing' ? 'bg-blue-50 text-blue-600' :
               currentPatient.status === 'paused' ? 'bg-yellow-50 text-yellow-600' :
               currentPatient.status === 'observation' ? 'bg-purple-50 text-purple-600' :
@@ -280,7 +287,7 @@ export default function QueueList({ onSelectPatient, onViewPatientDetails }: Que
       <div className="p-4 border-b border-gray-100">
         <h3 className="text-lg font-semibold text-gray-800">排队队列</h3>
         <p className="text-sm text-gray-500">
-          核验 {verifyingPatients.length} · 等待 {waitingPatients.length} · 输液 {infusingPatients.length} · 暂停 {pausedPatients.length} · 留观 {observationPatients.length}
+          核验 {verifyingPatients.length} · 等待 {waitingPatients.length} · 待开始 {seatedPatients.length} · 输液 {infusingPatients.length} · 暂停 {pausedPatients.length} · 留观 {observationPatients.length}
         </p>
       </div>
       {currentRole === 'nurse' && selectedPatientId && selectedIsWaitingOrVerifying && (
@@ -328,14 +335,33 @@ export default function QueueList({ onSelectPatient, onViewPatientDetails }: Que
               </div>
             )}
             {waitingPatients.length > 0 && (
+              <div className="mb-4">
+              {verifyingPatients.length > 0 && (
+                <h4 className="text-sm font-medium text-orange-600 mb-2 flex items-center gap-1">
+                  <Clock size={14} />
+                  等待中 ({waitingPatients.length})
+                </h4>
+              )}
+              {waitingPatients.map((patient, index) => (
+                <PatientItem
+                  key={patient.id}
+                  patient={patient}
+                  index={index}
+                  isSelected={selectedPatientId === patient.id}
+                  onSelect={() => handleSelectPatient(patient)}
+                  onViewDetails={() => handleViewDetails(patient)}
+                  currentRole={currentRole}
+                />
+              ))}
+              </div>
+            )}
+            {seatedPatients.length > 0 && (
               <div>
-                {verifyingPatients.length > 0 && (
-                  <h4 className="text-sm font-medium text-orange-600 mb-2 flex items-center gap-1">
-                    <Clock size={14} />
-                    等待中 ({waitingPatients.length})
-                  </h4>
-                )}
-                {waitingPatients.map((patient, index) => (
+                <h4 className="text-sm font-medium text-teal-600 mb-2 flex items-center gap-1">
+                  <UserCheck size={14} />
+                  待开始 ({seatedPatients.length})
+                </h4>
+                {seatedPatients.map((patient, index) => (
                   <PatientItem
                     key={patient.id}
                     patient={patient}

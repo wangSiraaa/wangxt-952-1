@@ -82,6 +82,7 @@ const SeatCell = memo(function SeatCell({
   const isObservationAlert = patient?.status === 'observation' && patient?.observationAlert;
   const isPaused = patient?.status === 'paused';
   const isObservation = patient?.status === 'observation';
+  const isSeated = patient?.status === 'seated';
 
   const config = statusConfig[seat.status];
   const Icon = config.icon;
@@ -115,7 +116,8 @@ const SeatCell = memo(function SeatCell({
         seat.status === 'disinfecting' && 'animate-pulse-slow',
         isObservationAlert && 'ring-2 ring-red-500 ring-offset-1 animate-breath',
         isPaused && 'ring-2 ring-yellow-500 ring-offset-1',
-        isObservation && !isObservationAlert && 'border-purple-500 bg-purple-50'
+        isObservation && !isObservationAlert && 'border-purple-500 bg-purple-50',
+        isSeated && 'border-teal-500 bg-teal-50'
       )}
     >
       <div className="flex flex-col items-center">
@@ -128,6 +130,11 @@ const SeatCell = memo(function SeatCell({
         )}
         {seat.status === 'occupied' && patient && (
           <div className="flex flex-wrap gap-0.5 mt-1 justify-center">
+            {patient.status === 'seated' && (
+              <span className="flex items-center gap-0.5 text-[10px] text-teal-700 bg-teal-100 px-1 rounded">
+                待开始
+              </span>
+            )}
             {patient.status === 'paused' && (
               <span className="flex items-center gap-0.5 text-[10px] text-yellow-700 bg-yellow-100 px-1 rounded">
                 <Pause size={8} />暂停
@@ -211,7 +218,7 @@ export default function SeatMap({ onSelectPatient, onClearSelection }: SeatMapPr
   const rows = Array.from(new Set(seats.map(s => s.row))).sort((a, b) => a - b);
   const selectedPatient = selectedPatientId ? getPatientById(selectedPatientId) : null;
   const hasSelectedPatientWaiting = selectedPatient?.status === 'waiting';
-  const hasSelectedPatientSeated = selectedPatient && ['infusing', 'paused', 'observation'].includes(selectedPatient.status);
+  const hasSelectedPatientSeated = selectedPatient && ['seated', 'infusing', 'paused', 'observation'].includes(selectedPatient.status);
 
   const handleSeatClick = (seat: Seat) => {
     if (seat.status === 'occupied') {
@@ -302,6 +309,10 @@ export default function SeatMap({ onSelectPatient, onClearSelection }: SeatMapPr
             <span className="text-xs text-gray-500">留观中</span>
           </div>
           <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded-full bg-teal-500" />
+            <span className="text-xs text-gray-500">待开始</span>
+          </div>
+          <div className="flex items-center gap-1.5">
             <div className="w-3 h-3 rounded-full bg-yellow-500" />
             <span className="text-xs text-gray-500">已暂停</span>
           </div>
@@ -327,7 +338,8 @@ export default function SeatMap({ onSelectPatient, onClearSelection }: SeatMapPr
                   {selectedPatient.status === 'waiting' && !selectedPatient.drugBatchVerified && '⚠️ 药品批次未核验，请先完成核验'}
                   {selectedPatient.status === 'waiting' && selectedPatient.drugBatchVerified && selectedPatient.isAllergyRisk && !selectedPatient.allergyConfirmed && '⚠️ 过敏待确认，请先确认过敏'}
                   {selectedPatient.status === 'waiting' && selectedPatient.drugBatchVerified && (!selectedPatient.isAllergyRisk || selectedPatient.allergyConfirmed) && '请点击一个绿色可用座位来安排患者'}
-                  {hasSelectedPatientSeated && '点击绿色可用座位换座，原座位将保留消毒倒计时'}
+                  {selectedPatient.status === 'seated' && '患者已入座，点击详情按钮开始输液'}
+                  {hasSelectedPatientSeated && selectedPatient.status !== 'seated' && '点击绿色可用座位换座，原座位将保留消毒倒计时'}
                 </p>
               </div>
               <button

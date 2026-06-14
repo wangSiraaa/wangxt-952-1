@@ -13,6 +13,7 @@ interface InfusionState {
   getStatistics: () => Statistics;
   getVerifyingPatients: () => Patient[];
   getWaitingPatients: () => Patient[];
+  getSeatedPatients: () => Patient[];
   getInfusingPatients: () => Patient[];
   getPausedPatients: () => Patient[];
   getObservationPatients: () => Patient[];
@@ -80,6 +81,7 @@ export const useInfusionStore = create<InfusionState>((set, get) => ({
     return {
       verifyingCount: patients.filter(p => p.status === 'verifying').length,
       waitingCount: patients.filter(p => p.status === 'waiting').length,
+      seatedCount: patients.filter(p => p.status === 'seated').length,
       infusingCount: patients.filter(p => p.status === 'infusing').length,
       pausedCount: patients.filter(p => p.status === 'paused').length,
       observationCount: patients.filter(p => p.status === 'observation').length,
@@ -97,6 +99,18 @@ export const useInfusionStore = create<InfusionState>((set, get) => ({
     const { patients } = get();
     return patients
       .filter(p => p.status === 'waiting')
+      .sort((a, b) => {
+        const aP = riskPriority(a);
+        const bP = riskPriority(b);
+        if (aP !== bP) return aP - bP;
+        return a.queueNumber.localeCompare(b.queueNumber);
+      });
+  },
+
+  getSeatedPatients: () => {
+    const { patients } = get();
+    return patients
+      .filter(p => p.status === 'seated')
       .sort((a, b) => {
         const aP = riskPriority(a);
         const bP = riskPriority(b);
@@ -124,8 +138,8 @@ export const useInfusionStore = create<InfusionState>((set, get) => ({
     const { patients } = get();
     return patients.filter(p =>
       (p.status === 'verifying') ||
-      (p.status === 'waiting' && p.isAllergyRisk && !p.allergyConfirmed) ||
-      (p.status === 'waiting' && p.isSpecialMedication) ||
+      ((p.status === 'waiting' || p.status === 'seated') && p.isAllergyRisk && !p.allergyConfirmed) ||
+      ((p.status === 'waiting' || p.status === 'seated') && p.isSpecialMedication) ||
       (p.skinTestResult === 'positive') ||
       (p.status === 'observation' && p.observationAlert)
     );
@@ -338,10 +352,7 @@ export const useInfusionStore = create<InfusionState>((set, get) => ({
               ...p,
               seatId,
               assignedAt: new Date(),
-              status: 'infusing' as PatientStatus,
-              infusionStartedAt: new Date(),
-              infusionPhase: 'first_bottle' as const,
-              currentBottle: 1,
+              status: 'seated' as PatientStatus,
             }
           : p
       ),
@@ -359,7 +370,7 @@ export const useInfusionStore = create<InfusionState>((set, get) => ({
     const patient = get().getPatientById(patientId);
     const newSeat = get().getSeatById(newSeatId);
     if (!patient || !newSeat) return false;
-    if (!['infusing', 'paused', 'observation'].includes(patient.status)) return false;
+    if (!['seated', 'infusing', 'paused', 'observation'].includes(patient.status)) return false;
     if (newSeat.status !== 'available') return false;
 
     if (patient.riskLevel === 'high' || patient.riskLevel === 'child' || patient.riskLevel === 'allergy_review') {
@@ -468,12 +479,12 @@ export const useInfusionStore = create<InfusionState>((set, get) => ({
   canCancelQueue: (patientId: string): boolean => {
     const patient = get().getPatientById(patientId);
     if (!patient) return false;
-    return ['verifying', 'waiting'].includes(patient.status);
+    return ['verifying', 'waiting', 'seated'].includes(patient.status);
   },
 
   canStartInfusion: (patientId: string): boolean => {
     const patient = get().getPatientById(patientId);
     if (!patient) return false;
-    return patient.status === 'waiting' && patient.seatId !== null;
+    return patient.status === 'seated';
   },
 }));
